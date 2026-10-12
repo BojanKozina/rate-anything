@@ -1,0 +1,8 @@
+{
+  "cmake.generator": "Ninja",
+  "cmake.buildDirectory": "${workspaceFolder}/build",
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "cmake.configureSettings": {
+    "CPM_SOURCE_CACHE": "${userHome}/.cache/CPM"
+  }
+}
