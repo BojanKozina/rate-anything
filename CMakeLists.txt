@@ -20,7 +20,7 @@ CPMAddPackage(
 # ------------------------------------------------------------
 
 add_executable(RateAnything)
-target_sources(RateAnything PRIVATE src/main.cpp)
+target_sources(RateAnything PRIVATE app/main.cpp)
 
 target_compile_features(RateAnything PRIVATE cxx_std_23)
 set_target_properties(RateAnything PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)

@@ -25,7 +25,7 @@ coco::stray start(saucer::application *app)
         co_return random;
     });
 
-    webview->set_url("http://localhost:4200/");
+    webview->set_url("https://saucer.app");
 
     window->show();
 
