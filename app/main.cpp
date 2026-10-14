@@ -6,15 +6,15 @@ coco::stray start(saucer::application *app) {
   auto window = saucer::window::create(app).value();
   auto webview = saucer::smartview::create({.window = window});
 
-    const saucer::color background_color{0x0B, 0x09, 0x09, 0xFF};
+  const saucer::color background_color{0x0B, 0x09, 0x09, 0xFF};
+  const saucer::size min_window_size{800, 600};
 
-  window->set_title("RateAnything");
+  window->set_min_size(min_window_size);
 
   window->set_decorations(saucer::window::decoration::partial);
 
-
-
   window->set_background(background_color);
+  webview->set_background(background_color);
 
   webview->expose("call_me", [&](double a, double b) {
     std::println("Called with: a = {}, b = {}", a, b);
@@ -38,5 +38,5 @@ coco::stray start(saucer::application *app) {
 }
 
 int main() {
-  return saucer::application::create({.id = "hello-world"})->run(start);
+  return saucer::application::create({.id = "rate-anything"})->run(start);
 }

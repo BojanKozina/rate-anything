@@ -8,3 +8,7 @@ body,
   height: 100%;
   background: #0b0909;
 }
+
+* {
+  outline: 1px solid rgba(255, 0, 0, 0.4);
+}
