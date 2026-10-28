@@ -14,7 +14,6 @@ const categories = [
 ];
 
 
-const printUsers = exposed<string, []>("printUsers");
 
 
 export function Cards() {
@@ -29,14 +28,6 @@ export function Cards() {
           type="button"
           className="cursor-target rounded-[15px] outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           data-cursor-label={`Go to ${category.label}`}
-          onClick={() => {
-            printUsers()
-              .then((usersString) => {
-                console.log("Users printed successfully!");
-                console.log(usersString); 
-              })
-              .catch((err) => console.error("Saucer IPC Error:", err));
-          }}
         >
       <TiltedCard
         imageSrc={category.image}

@@ -385,7 +385,7 @@ const TargetCursor = ({
           ref={element => {
             cornerRefs.current[i] = element;
           }}
-          className="absolute top-0 left-0 box-border origin-top-left border-solid [border-color:var(--target-cursor-color,#ffffff)] will-change-transform"
+          className="absolute top-0 left-0 box-border origin-top-left border-solid border-(--target-cursor-color,#ffffff) will-change-transform"
         />
       ))}
       <span
@@ -394,7 +394,7 @@ const TargetCursor = ({
       />
       <span
         ref={labelRef}
-        className="absolute top-0 left-0 text-[12px] leading-none font-medium whitespace-nowrap opacity-0 [color:var(--target-cursor-color,#ffffff)] will-change-[transform,opacity]"
+        className="absolute top-0 left-0 text-[12px] leading-none font-medium whitespace-nowrap opacity-0 text-(--target-cursor-color,#ffffff) will-change-[transform,opacity]"
       />
     </div>,
     host
