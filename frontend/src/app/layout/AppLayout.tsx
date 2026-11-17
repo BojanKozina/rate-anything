@@ -33,8 +33,12 @@ export default function AppLayout() {
       <div className="relative flex h-screen flex-col">
         <TitleBar />
 
-        <main ref={contentRef} className="relative flex-1">
-          <Outlet />   {/* the current page renders here */}
+        <main ref={contentRef} className="relative flex-1 overflow-hidden">
+          {/* Only this inner div scrolls, so the dock below stays put. */}
+          {/* Dock clearance lives on each page, so a full-bleed page background can reach the bottom. */}
+          <div className="h-full overflow-y-auto overscroll-contain [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
+            <Outlet />   {/* the current page renders here */}
+          </div>
           <AppDock />
         </main>
       </div>

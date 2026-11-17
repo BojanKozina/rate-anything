@@ -13,7 +13,7 @@ export default function GamesPage() {
 
 
     return (
-        <div className="p-8 text-white">
+        <div className="p-8 pb-28 text-white">
             <button
                 type="button"
                 className="cursor-target mb-6 rounded-lg bg-white/10 px-4 py-2 backdrop-blur-sm hover:bg-white/20"
