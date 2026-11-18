@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import GameCard, { type Game, type GameCardSize } from "@/components/GameCard";
-import GameCardMini from "@/components/GameCardMini";
 
 
 declare global {
@@ -13,19 +12,16 @@ declare global {
   }
 }
 
-type ViewSize = GameCardSize | "mini";
-
-const VIEW_SIZES: { value: ViewSize; label: string }[] = [
+const VIEW_SIZES: { value: GameCardSize; label: string }[] = [
   { value: "big", label: "Big" },
-  { value: "medium", label: "Medium" },
-  { value: "mini", label: "Small" },
+  { value: "small", label: "Small" },
 ];
 
 export default function GameLibrary() {
   const [games, setGames] = useState<Game[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [viewSize, setViewSize] = useState<ViewSize>("big");
+  const [viewSize, setViewSize] = useState<GameCardSize>("big");
 
   useEffect(() => {
     // Promise.resolve turns a missing window.saucer (frontend run outside the app) into the error UI below.
@@ -53,22 +49,16 @@ export default function GameLibrary() {
         ))}
       </div>
 
-      <div
-        className={`flex flex-wrap justify-center p-6 ${viewSize === "mini" ? "gap-1.5" : "gap-10"}`}
-      >
-        {games.map((game) =>
-          viewSize === "mini" ? (
-            <GameCardMini key={game.id} game={game} onClick={() => setSelectedId(game.id)} />
-          ) : (
-            <GameCard
-              key={game.id}
-              game={game}
-              size={viewSize}
-              selected={game.id === selectedId}
-              onClick={() => setSelectedId(game.id)}
-            />
-          )
-        )}
+      <div className="flex flex-wrap justify-center gap-10 p-6">
+        {games.map((game) => (
+          <GameCard
+            key={game.id}
+            game={game}
+            size={viewSize}
+            selected={game.id === selectedId}
+            onClick={() => setSelectedId(game.id)}
+          />
+        ))}
       </div>
     </div>
   );

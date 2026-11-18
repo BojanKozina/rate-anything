@@ -74,37 +74,8 @@ COVER_URL = "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/{image_id}
 # IGDB allows 4 requests per second
 REQUEST_DELAY = 0.3
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS "Games" (
-    "Id"          INTEGER PRIMARY KEY AUTOINCREMENT,
-    "IgdbId"      INTEGER UNIQUE,
-    "Name"        TEXT    NOT NULL,
-    "Status"      INTEGER NOT NULL DEFAULT 1 CHECK ("Status" IN (1, 2, 3)),
-    "Rating"      INTEGER CHECK ("Rating" BETWEEN 1 AND 5),
-    "Description" TEXT,
-    "ReleaseDate" TEXT,
-    "CoverPath"   TEXT
-);
-
-CREATE TABLE IF NOT EXISTS "G_Categories" (
-    "Id"   INTEGER PRIMARY KEY AUTOINCREMENT,
-    "Name" TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE IF NOT EXISTS "Games_Categories" (
-    "GameId"     INTEGER NOT NULL REFERENCES "Games"("Id")        ON DELETE CASCADE,
-    "CategoryId" INTEGER NOT NULL REFERENCES "G_Categories"("Id") ON DELETE CASCADE,
-    PRIMARY KEY ("GameId", "CategoryId")
-);
-
-CREATE TABLE IF NOT EXISTS "G_Screenshots" (
-    "Id"     INTEGER PRIMARY KEY AUTOINCREMENT,
-    "GameId" INTEGER NOT NULL REFERENCES "Games"("Id") ON DELETE CASCADE,
-    "Path"   TEXT    NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS "IX_G_Screenshots_GameId" ON "G_Screenshots"("GameId");
-"""
+# The app owns the schema (app/main.cpp); this just checks the database exists.
+REQUIRED_TABLE = "Media"
 
 
 def get_token(client_id: str, client_secret: str) -> str | None:
@@ -166,33 +137,37 @@ def to_date(timestamp: int | None) -> str | None:
 
 
 def save_game(db: sqlite3.Connection, game: dict, cover_path: str | None) -> int:
-    """Inserts the game and its genres. Returns the new game's Id."""
+    """Inserts the game and its genres. Returns the new Media Id."""
     cursor = db.execute(
         """
-        INSERT INTO "Games" ("IgdbId", "Name", "Description", "ReleaseDate", "CoverPath")
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO "Media" ("Type", "Name", "Summary", "ReleaseDate", "CoverPath",
+                             "ExternalSource", "ExternalId")
+        VALUES ('game', ?, ?, ?, ?, 'igdb', ?)
         """,
         (
-            game["id"],
             game["name"],
             game.get("summary"),
             to_date(game.get("first_release_date")),
             cover_path,
+            str(game["id"]),
         ),
     )
-    game_id = cursor.lastrowid
+    media_id = cursor.lastrowid
 
     for genre in game.get("genres", []):
-        db.execute('INSERT OR IGNORE INTO "G_Categories" ("Name") VALUES (?)', (genre["name"],))
+        db.execute(
+            '''INSERT OR IGNORE INTO "Categories" ("Type", "Name") VALUES ('game', ?)''',
+            (genre["name"],),
+        )
         db.execute(
             """
-            INSERT OR IGNORE INTO "Games_Categories" ("GameId", "CategoryId")
-            SELECT ?, "Id" FROM "G_Categories" WHERE "Name" = ?
+            INSERT OR IGNORE INTO "MediaCategories" ("MediaId", "CategoryId")
+            SELECT ?, "Id" FROM "Categories" WHERE "Type" = 'game' AND "Name" = ?
             """,
-            (game_id, genre["name"]),
+            (media_id, genre["name"]),
         )
 
-    return game_id
+    return media_id
 
 
 def main() -> int:
@@ -214,7 +189,14 @@ def main() -> int:
 
     db = sqlite3.connect(DB_PATH)
     db.execute("PRAGMA foreign_keys = ON;")
-    db.executescript(SCHEMA)
+
+    has_schema = db.execute(
+        '''SELECT 1 FROM "sqlite_master" WHERE "type" = 'table' AND "name" = ?''', (REQUIRED_TABLE,)
+    ).fetchone()
+    if not has_schema:
+        print(f"No '{REQUIRED_TABLE}' table in {DB_PATH}. Run the app once to create the database.")
+        db.close()
+        return 1
 
     token = get_token(CLIENT_ID, CLIENT_SECRET)
     if token is None:
@@ -234,7 +216,10 @@ def main() -> int:
                 failed += 1
                 continue
 
-            exists = db.execute('SELECT 1 FROM "Games" WHERE "IgdbId" = ?', (game["id"],)).fetchone()
+            exists = db.execute(
+                '''SELECT 1 FROM "Media" WHERE "ExternalSource" = 'igdb' AND "ExternalId" = ?''',
+                (str(game["id"]),),
+            ).fetchone()
             if exists:
                 print(f"  - {game['name']}: already in database, skipped")
                 skipped += 1

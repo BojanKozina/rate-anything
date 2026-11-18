@@ -18,45 +18,142 @@ struct GameDto
 
 namespace
 {
-    // Creates all tables if they don't exist yet. Safe to run on every startup.
+    // shortcut: single local user, hard-coded. Replace when the app grows real accounts.
+    constexpr int CURRENT_USER_ID = 1;
+
+    // One "Media" row per rateable thing. Safe to run on every startup.
     void init_schema(SQLite::Database &db)
     {
         db.exec(R"sql(
-            CREATE TABLE IF NOT EXISTS "Games" (
-                "Id"          INTEGER PRIMARY KEY AUTOINCREMENT,
-                "IgdbId"      INTEGER UNIQUE,
-                "Name"        TEXT    NOT NULL,
-                "Status"      INTEGER NOT NULL DEFAULT 1 CHECK ("Status" IN (1, 2, 3)),
-                "Rating"      INTEGER CHECK ("Rating" BETWEEN 1 AND 5),
-                "Description" TEXT,
-                "ReleaseDate" TEXT,
-                "CoverPath"   TEXT
+            CREATE TABLE IF NOT EXISTS "Media" (
+                "Id"             INTEGER PRIMARY KEY AUTOINCREMENT,
+                "Type"           TEXT    NOT NULL CHECK ("Type" IN ('game', 'movie', 'book')),
+                "Name"           TEXT    NOT NULL,
+                "Description"    TEXT,
+                "Summary"        TEXT,
+                "ReleaseDate"    TEXT,
+                "CoverPath"      TEXT,
+                "ExternalSource" TEXT,
+                "ExternalId"     TEXT,
+                "CreatedAt"      TEXT    NOT NULL DEFAULT (datetime('now')),
+                UNIQUE ("ExternalSource", "ExternalId")
             );
- 
-            CREATE TABLE IF NOT EXISTS "G_Categories" (
-                "Id"   INTEGER PRIMARY KEY AUTOINCREMENT,
-                "Name" TEXT NOT NULL UNIQUE
+
+            CREATE INDEX IF NOT EXISTS "IX_Media_Type" ON "Media"("Type", "Name");
+
+            CREATE TABLE IF NOT EXISTS "Categories" (
+                "Id"        INTEGER PRIMARY KEY AUTOINCREMENT,
+                "Type"      TEXT NOT NULL CHECK ("Type" IN ('game', 'movie', 'book')),
+                "Name"      TEXT NOT NULL,
+                "CreatedAt" TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE ("Type", "Name")
             );
- 
-            CREATE TABLE IF NOT EXISTS "Games_Categories" (
-                "GameId"     INTEGER NOT NULL REFERENCES "Games"("Id")        ON DELETE CASCADE,
-                "CategoryId" INTEGER NOT NULL REFERENCES "G_Categories"("Id") ON DELETE CASCADE,
-                PRIMARY KEY ("GameId", "CategoryId")
+
+            CREATE TABLE IF NOT EXISTS "MediaCategories" (
+                "MediaId"    INTEGER NOT NULL REFERENCES "Media"("Id")      ON DELETE CASCADE,
+                "CategoryId" INTEGER NOT NULL REFERENCES "Categories"("Id") ON DELETE CASCADE,
+                "CreatedAt"  TEXT    NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY ("MediaId", "CategoryId")
             );
- 
-            CREATE TABLE IF NOT EXISTS "G_Screenshots" (
-                "Id"     INTEGER PRIMARY KEY AUTOINCREMENT,
-                "GameId" INTEGER NOT NULL REFERENCES "Games"("Id") ON DELETE CASCADE,
-                "Path"   TEXT    NOT NULL
+
+            CREATE INDEX IF NOT EXISTS "IX_MediaCategories_Category" ON "MediaCategories"("CategoryId");
+
+            CREATE TABLE IF NOT EXISTS "MediaAssets" (
+                "Id"        INTEGER PRIMARY KEY AUTOINCREMENT,
+                "MediaId"   INTEGER NOT NULL REFERENCES "Media"("Id") ON DELETE CASCADE,
+                "Type"      TEXT    NOT NULL CHECK ("Type" IN ('screenshot', 'trailer')),
+                "Path"      TEXT    NOT NULL,
+                "Position"  INTEGER NOT NULL DEFAULT 0,
+                "CreatedAt" TEXT    NOT NULL DEFAULT (datetime('now'))
             );
- 
-            CREATE INDEX IF NOT EXISTS "IX_G_Screenshots_GameId" ON "G_Screenshots"("GameId");
+
+            CREATE INDEX IF NOT EXISTS "IX_MediaAssets_Media" ON "MediaAssets"("MediaId", "Type", "Position");
+
+            CREATE TABLE IF NOT EXISTS "Users" (
+                "Id"           INTEGER PRIMARY KEY AUTOINCREMENT,
+                "Username"     TEXT    NOT NULL UNIQUE,
+                "Email"        TEXT    NOT NULL UNIQUE,
+                "FirstName"    TEXT,
+                "LastName"     TEXT,
+                "ProfileBio"   TEXT,
+                "ProfileImage" TEXT,
+                "Public"       INTEGER NOT NULL DEFAULT 0,
+                "CreatedAt"    TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+
+            -- A user's relationship to one item: progress and favourite.
+            CREATE TABLE IF NOT EXISTS "UserMedia" (
+                "UserId"    INTEGER NOT NULL REFERENCES "Users"("Id") ON DELETE CASCADE,
+                "MediaId"   INTEGER NOT NULL REFERENCES "Media"("Id") ON DELETE CASCADE,
+                "Status"    INTEGER NOT NULL DEFAULT 1 CHECK ("Status" IN (1, 2, 3)),
+                "Favourite" INTEGER NOT NULL DEFAULT 0,
+                "CreatedAt" TEXT    NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY ("UserId", "MediaId")
+            );
+
+            CREATE INDEX IF NOT EXISTS "IX_UserMedia_Media" ON "UserMedia"("MediaId");
+
+            CREATE TABLE IF NOT EXISTS "Reviews" (
+                "Id"        INTEGER PRIMARY KEY AUTOINCREMENT,
+                "UserId"    INTEGER NOT NULL REFERENCES "Users"("Id") ON DELETE CASCADE,
+                "MediaId"   INTEGER NOT NULL REFERENCES "Media"("Id") ON DELETE CASCADE,
+                "Rating"    INTEGER NOT NULL CHECK ("Rating" BETWEEN 1 AND 5),
+                "Title"     TEXT,
+                "Body"      TEXT,
+                "CreatedAt" TEXT    NOT NULL DEFAULT (datetime('now')),
+                UNIQUE ("UserId", "MediaId")
+            );
+
+            CREATE INDEX IF NOT EXISTS "IX_Reviews_Media" ON "Reviews"("MediaId");
+
+            CREATE TABLE IF NOT EXISTS "People" (
+                "Id"        INTEGER PRIMARY KEY AUTOINCREMENT,
+                "Name"      TEXT NOT NULL UNIQUE,
+                "CreatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            -- Cast, directors and authors: a person in a role.
+            CREATE TABLE IF NOT EXISTS "MediaCredits" (
+                "MediaId"   INTEGER NOT NULL REFERENCES "Media"("Id")  ON DELETE CASCADE,
+                "PersonId"  INTEGER NOT NULL REFERENCES "People"("Id") ON DELETE CASCADE,
+                "Role"      TEXT    NOT NULL CHECK ("Role" IN ('actor', 'director', 'author', 'developer', 'publisher', 'composer')),
+                "Character" TEXT,
+                "Position"  INTEGER NOT NULL DEFAULT 0,
+                "CreatedAt" TEXT    NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY ("MediaId", "PersonId", "Role")
+            );
+
+            CREATE INDEX IF NOT EXISTS "IX_MediaCredits_Person" ON "MediaCredits"("PersonId");
+
+            -- Optional, 0-or-1 per item.
+            CREATE TABLE IF NOT EXISTS "GameDetails" (
+                "MediaId"   INTEGER PRIMARY KEY REFERENCES "Media"("Id") ON DELETE CASCADE,
+                "Platform"  TEXT,
+                "CreatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS "MovieDetails" (
+                "MediaId"        INTEGER PRIMARY KEY REFERENCES "Media"("Id") ON DELETE CASCADE,
+                "Studio"         TEXT,
+                "RuntimeMinutes" INTEGER,
+                "Language"       TEXT,
+                "AgeRating"      TEXT,
+                "CreatedAt"      TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS "BookDetails" (
+                "MediaId"   INTEGER PRIMARY KEY REFERENCES "Media"("Id") ON DELETE CASCADE,
+                "Publisher" TEXT,
+                "PageCount" INTEGER,
+                "Isbn"      TEXT,
+                "CreatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+            );
         )sql");
     }
- 
+
     // ---------- Seeder ----------
-    // Fills the database with test data, but only if the Games table is empty.
- 
+    // Test data, only when the database is empty.
+
     struct SeedGame
     {
         std::string name;
@@ -64,23 +161,31 @@ namespace
         std::optional<int> rating;  // nullopt = not rated
         std::string release_date;
         std::string cover;          // "covers/far-cry-3.webp"
-        std::string category;       // one of the names in G_Categories
+        std::string category;       // one of the names inserted below
     };
- 
+
     void seed(SQLite::Database &db)
     {
-        const int existing = db.execAndGet(R"(SELECT COUNT(*) FROM "Games")").getInt();
+        const int existing = db.execAndGet(R"(SELECT COUNT(*) FROM "Media")").getInt();
         if (existing > 0)
         {
-            return; // already seeded (or the user has real data)
+            return; // already has data
         }
- 
+
         // One transaction: either everything is inserted or nothing is (and it's much faster)
         SQLite::Transaction transaction(db);
- 
-        // Categories
-        db.exec(R"(INSERT INTO "G_Categories" ("Name") VALUES ('Action'), ('RPG'), ('Puzzle'))");
- 
+
+        db.exec(R"(
+            INSERT INTO "Users" ("Id", "Username", "Email")
+            SELECT 1, 'local', 'local@localhost'
+            WHERE NOT EXISTS (SELECT 1 FROM "Users" WHERE "Id" = 1)
+        )");
+
+        db.exec(R"(
+            INSERT INTO "Categories" ("Type", "Name")
+            VALUES ('game', 'Action'), ('game', 'RPG'), ('game', 'Puzzle')
+        )");
+
         const std::vector<SeedGame> games = {
             {"Far Cry 3",                3, 4,            "2012-11-29", "covers/far-cry-3.webp",    "Action"},
             {"Far Cry 4",                2, std::nullopt, "2014-11-18", "covers/far-cry-4.webp",    "Action"},
@@ -88,34 +193,56 @@ namespace
             {"The Witcher 3: Wild Hunt", 3, 5,            "2015-05-19", "covers/witcher-3.webp",    "RPG"},
             {"Portal 2",                 3, 5,            "2011-04-18", "covers/portal-2.webp",     "Puzzle"},
         };
- 
-        SQLite::Statement insert_game(db, R"(
-            INSERT INTO "Games" ("Name", "Status", "Rating", "ReleaseDate", "CoverPath")
-            VALUES (?, ?, ?, ?, ?)
+
+        SQLite::Statement insert_media(db, R"(
+            INSERT INTO "Media" ("Type", "Name", "ReleaseDate", "CoverPath")
+            VALUES ('game', ?, ?, ?)
         )");
- 
+
+        SQLite::Statement insert_status(db, R"(
+            INSERT INTO "UserMedia" ("UserId", "MediaId", "Status") VALUES (?, ?, ?)
+        )");
+
+        SQLite::Statement insert_review(db, R"(
+            INSERT INTO "Reviews" ("UserId", "MediaId", "Rating") VALUES (?, ?, ?)
+        )");
+
         SQLite::Statement link_category(db, R"(
-            INSERT INTO "Games_Categories" ("GameId", "CategoryId")
-            SELECT ?, "Id" FROM "G_Categories" WHERE "Name" = ?
+            INSERT INTO "MediaCategories" ("MediaId", "CategoryId")
+            SELECT ?, "Id" FROM "Categories" WHERE "Type" = 'game' AND "Name" = ?
         )");
- 
+
         for (const auto &game : games)
         {
-            insert_game.bind(1, game.name);
-            insert_game.bind(2, game.status);
-            if (game.rating) insert_game.bind(3, *game.rating);
-            else             insert_game.bind(3); // binds NULL
-            insert_game.bind(4, game.release_date);
-            insert_game.bind(5, game.cover);
-            insert_game.exec();
-            insert_game.reset();
- 
-            link_category.bind(1, db.getLastInsertRowid());
+            insert_media.bind(1, game.name);
+            insert_media.bind(2, game.release_date);
+            insert_media.bind(3, game.cover);
+            insert_media.exec();
+            insert_media.reset();
+
+            const auto media_id = db.getLastInsertRowid();
+
+            insert_status.bind(1, CURRENT_USER_ID);
+            insert_status.bind(2, media_id);
+            insert_status.bind(3, game.status);
+            insert_status.exec();
+            insert_status.reset();
+
+            if (game.rating)
+            {
+                insert_review.bind(1, CURRENT_USER_ID);
+                insert_review.bind(2, media_id);
+                insert_review.bind(3, *game.rating);
+                insert_review.exec();
+                insert_review.reset();
+            }
+
+            link_category.bind(1, media_id);
             link_category.bind(2, game.category);
             link_category.exec();
             link_category.reset();
         }
- 
+
         transaction.commit();
     }
 }
@@ -144,7 +271,18 @@ coco::stray start(saucer::application *app)
 
     webview->expose("getGames", [&]() -> std::vector<GameDto>
     {
-        SQLite::Statement query(db, R"(SELECT "Id", "Name", "Status", "Rating", "CoverPath" FROM "Games" ORDER BY "Name")");
+        // 'movie' or 'book' here gives the other pages.
+        SQLite::Statement query(db, R"(
+            SELECT m."Id", m."Name", COALESCE(um."Status", 1), r."Rating", m."CoverPath"
+            FROM "Media" m
+            LEFT JOIN "UserMedia" um ON um."MediaId" = m."Id" AND um."UserId" = ?
+            LEFT JOIN "Reviews"   r  ON r."MediaId"  = m."Id" AND r."UserId"  = ?
+            WHERE m."Type" = 'game'
+            ORDER BY m."Name"
+        )");
+
+        query.bind(1, CURRENT_USER_ID);
+        query.bind(2, CURRENT_USER_ID);
 
         std::vector<GameDto> games;
 
