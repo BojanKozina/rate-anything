@@ -1,8 +1,13 @@
 {
   "cmake.generator": "Ninja",
   "cmake.buildDirectory": "${workspaceFolder}/build",
-  "C_Cpp.intelliSenseEngine": "disabled",
   "cmake.configureSettings": {
     "CPM_SOURCE_CACHE": "${userHome}/.cache/CPM"
-  }
+  },
+
+  // Microsoft's engine, not clangd: this is an MSVC build, and Clang cannot parse
+  // MSVC 14.51's STL internals or its "-std:c++latest" spelling.
+  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+  "clangd.enable": false
 }

@@ -1,4 +1,11 @@
 build/
 .cache/
 compile_commands.json
-frontend/public/covers/a22cc94f-9dc9-4ea0-8d15-462eb1893b0d.webp
+__pycache__/
+
+# Cover art is downloaded by fetch_games.py and regenerable; keep it out of history.
+frontend/public/covers/
+
+# Real API credentials. Only the .example is committed.
+igdb_credentials.txt
+fetch_games.py

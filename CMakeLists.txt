@@ -9,6 +9,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(cmake/CPM.cmake)
 
+# saucer-fill decides whether to polyfill std::jthread / move_only_function / views::join_with by
+# compiling AND LINKING a test program. Configure without the MSVC environment (VS Code's CMake
+# Tools with no kit selected) and that link fails for want of the CRT, so fill concludes the types
+# are missing and redeclares them into namespace std -- every build then dies on
+# "C2874: multiple declaration of 'std::jthread'". MSVC 19.40+ has all three, so don't ask.
+if(MSVC AND MSVC_VERSION GREATER_EQUAL 1940)
+    set(fill_replacements "" CACHE STRING "Standard library features to polyfill" FORCE)
+endif()
+
 CPMAddPackage(
     NAME           saucer
     GIT_TAG ver/8.2.0
