@@ -2,25 +2,9 @@
 #include <saucer/smartview.hpp>
 #include <saucer/window.hpp>
 
-#include <optional>
-#include <string>
-#include <vector>
-
-
-struct GameDto
-{
-    int id;
-    std::string name;
-    int status;
-    std::optional<int> rating;
-    std::optional<std::string> cover;
-};
 
 namespace
 {
-    // shortcut: single local user, hard-coded. Replace when the app grows real accounts.
-    constexpr int CURRENT_USER_ID = 1;
-
     // One "Media" row per rateable thing. Safe to run on every startup.
     void init_schema(SQLite::Database &db)
     {
@@ -172,47 +156,6 @@ coco::stray start(saucer::application *app)
     window->set_decorations(saucer::window::decoration::partial);
     window->set_background(background_color);
     webview->set_background(background_color);
-
-
-    webview->expose("getGames", [&]() -> std::vector<GameDto>
-    {
-        // 'movie' or 'book' here gives the other pages.
-        SQLite::Statement query(db, R"(
-            SELECT m."Id", m."Name", COALESCE(um."Status", 1), r."Rating", m."CoverPath"
-            FROM "Media" m
-            LEFT JOIN "UserMedia" um ON um."MediaId" = m."Id" AND um."UserId" = ?
-            LEFT JOIN "Reviews"   r  ON r."MediaId"  = m."Id" AND r."UserId"  = ?
-            WHERE m."Type" = 'game'
-            ORDER BY m."Name"
-        )");
-
-        query.bind(1, CURRENT_USER_ID);
-        query.bind(2, CURRENT_USER_ID);
-
-        std::vector<GameDto> games;
-
-        while (query.executeStep())
-        {
-            GameDto game{
-                .id     = query.getColumn(0).getInt(),
-                .name   = query.getColumn(1).getString(),
-                .status = query.getColumn(2).getInt(),
-            };
-
-            if (!query.getColumn(3).isNull())
-            {
-                game.rating = query.getColumn(3).getInt();
-            }
-            if (!query.getColumn(4).isNull())
-            {
-                game.cover = query.getColumn(4).getString();
-            }
-
-            games.push_back(std::move(game));
-        }
-
-        return games;
-    });
 
 
     webview->set_url("http://localhost:5173/");
