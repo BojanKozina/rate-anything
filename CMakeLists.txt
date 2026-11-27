@@ -45,6 +45,9 @@ target_sources(RateAnything PRIVATE app/main.cpp)
 if(WIN32)
     enable_language(RC)
     target_sources(RateAnything PRIVATE app/resources/app.rc)
+    # RC deps are not scanned by the generator, so .ico edits alone would not relink
+    set_property(SOURCE app/resources/app.rc PROPERTY OBJECT_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/app.ico)
 endif()
 
 target_compile_features(RateAnything PRIVATE cxx_std_23)

@@ -162,6 +162,14 @@ coco::stray start(saucer::application *app)
 
     webview->on<saucer::webview::event::load>([&](auto) { window->show(); });
 
+
+
+
+
+
+
+    
+
     co_await app->finish();
 }
 
